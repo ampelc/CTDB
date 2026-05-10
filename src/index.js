@@ -3,7 +3,7 @@ const filter = new Filter();
 
 export default {
   async fetch(request, env) {
-    const ADMIN_PASS = env.ADMIN_PASS;
+    const ADMIN_PASS = env.ADMIN_PASS || 'admin'; // IF YOU DEPLOY THIS PLEASE SET ADMIN PASS TO YOUR OWN!!!
     const url = new URL(request.url);
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const origin = request.headers.get("Origin") || "";
@@ -62,29 +62,37 @@ export default {
     }
 
     // 📦 MOD LIST (Admin)
-    if (url.pathname === "/moderate/list") {
-      const pass = request.headers.get("x-pass");
-      if (!ADMIN_PASS || pass !== ADMIN_PASS) return new Response("Unauthorized", { status: 403 });
+	if (url.pathname === "/moderate/list") {
+	  const pass = request.headers.get("x-pass");
+	  if (!ADMIN_PASS || pass !== ADMIN_PASS) return new Response("Unauthorized", { status: 403 });
 
-      const list = await env.DB.list();
-      let html = "";
-      for (const key of list.keys.slice(0, 50)) {
-        const val = await env.DB.get(key.name);
-        html += `
-          <div class="item p-6 hover:bg-gray-50 transition-colors">
-            <div class="flex justify-between items-start mb-2">
-              <span class="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${key.name}</span>
-              <button hx-post="/moderate/delete" hx-include='{"key":"${key.name}","pass":"${pass}"}' 
-                      hx-target="closest .item" hx-swap="outerHTML"
-                      class="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-xs font-semibold border border-red-200">
-                Delete
-              </button>
-            </div>
-            <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto shadow-inner">${val}</pre>
-          </div>`;
-      }
-      return new Response(html || '<p class="p-10 text-center">Empty.</p>', { headers: { "content-type": "text/html" } });
-    }
+	  const list = await env.DB.list();
+	  let html = "";
+	  for (const key of list.keys.slice(0, 50)) {
+	    const val = await env.DB.get(key.name);
+	    
+	    // Escape values for safe HTML rendering
+	    const safeKeyName = escapeHtml(key.name);
+	    const safeKeyAttr = escapeHtml(JSON.stringify(key.name)); // Safely stringify for JSON attributes
+	    const safeVal = escapeHtml(val);
+
+	    html += `
+	      <div class="item p-6 hover:bg-gray-50 transition-colors">
+	        <div class="flex justify-between items-start mb-2">
+	          <span class="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${safeKeyName}</span>
+	          <button hx-post="/moderate/delete" 
+	                  hx-vals='{"key": ${safeKeyAttr}, "pass": "${escapeHtml(pass)}"}' 
+	                  hx-target="closest .item" 
+	                  hx-swap="outerHTML"
+	                  class="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-xs font-semibold border border-red-200">
+	            Delete
+	          </button>
+	        </div>
+	        <pre class="bg-gray-800 text-green-400 p-4 rounded-lg text-xs overflow-x-auto shadow-inner">${safeVal}</pre>
+	      </div>`;
+	  }
+	  return new Response(html || '<p class="p-10 text-center">Empty.</p>', { headers: { "content-type": "text/html" } });
+	}
 
     // 🗑 MOD DELETE ACTION (HTMX)
     if (url.pathname === "/moderate/delete" && request.method === "POST") {
@@ -196,4 +204,13 @@ function getIndexHtml() {
     </body>
     </html>
   `;
+}
+function escapeHtml(str) {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
