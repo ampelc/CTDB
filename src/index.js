@@ -63,8 +63,8 @@ export default {
 
     // 📦 MOD LIST (Admin)
 	if (url.pathname === "/moderate/list") {
-	  const pass = request.headers.get("x-pass");
-	  if (!ADMIN_PASS || pass !== ADMIN_PASS) return new Response("Unauthorized", { status: 403 });
+	  // const pass = request.headers.get("x-pass");
+	  // if (!ADMIN_PASS || pass !== ADMIN_PASS) return new Response("Unauthorized", { status: 403 });
 
 	  const list = await env.DB.list();
 	  let html = "";
