@@ -25,7 +25,7 @@
 	        "name": "RATE_LIMITER",
 	        "namespace_id": "1",
 	        "simple": {
-	            "limit": 10,
+	            "limit": 32,
 	            "period": 60
 	        }
 	    }
