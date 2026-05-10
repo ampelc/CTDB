@@ -6,6 +6,13 @@ export default {
     const ADMIN_PASS = env.ADMIN_PASS;
     const url = new URL(request.url);
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const origin = request.headers.get("Origin") || "";
+    
+    // Check if we are in dev mode (localhost)
+    const isDev = origin.includes("localhost") || url.hostname === "127.0.0.1";
+    const cacheHeader = isDev 
+      ? "no-store, no-cache, must-revalidate, proxy-revalidate" 
+      : "public, max-age=259200"; // 72 Hours
 
     // 🌐 CORS preflight
     if (request.method === "OPTIONS") {
@@ -16,18 +23,29 @@ export default {
     if (url.pathname === "/extension.js") {
       const file = await env.DB.get("extension.js");
       if (!file) return new Response("// extension.js not found", { status: 404 });
-      return new Response(file, { headers: { ...cors(), "content-type": "text/javascript" } });
+      return new Response(file, { 
+        headers: { 
+          ...cors(), 
+          "content-type": "text/javascript",
+          "Cache-Control": cacheHeader
+        } 
+      });
     }
 
     // 🛡️ RATE LIMIT (Applies to all API and Mod routes)
     if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/CTDBv2/") || url.pathname.startsWith("/moderate")) {
-	const { success } = await env.MY_RATE_LIMITER.limit({ key: ip });
-   if (!success) return new Response("Too many requests", { status: 429 });
+      const { success } = await env.RATE_LIMITER.limit({ key: ip });
+      if (!success) return new Response(JSON.stringify({error: "Too many requests"}), { status: 429 });
     }
 
     // 🏠 ROOT INDEX
     if (url.pathname === "/") {
-      return new Response(getIndexHtml(), { headers: { "content-type": "text/html" } });
+      return new Response(getIndexHtml(), { 
+        headers: { 
+          "content-type": "text/html",
+          "Cache-Control": cacheHeader
+        } 
+      });
     }
 
     // 🌐 MODERATION UI
@@ -35,7 +53,11 @@ export default {
       const html = await env.DB.get("admin.html");
       return new Response(html || "admin.html missing from KV", {
         status: html ? 200 : 404,
-        headers: { ...cors(), "content-type": "text/html" }
+        headers: { 
+          ...cors(), 
+          "content-type": "text/html",
+          "Cache-Control": cacheHeader
+        }
       });
     }
 
@@ -104,8 +126,6 @@ export default {
       const scope = url.searchParams.get("scope") || "CT"; 
       
       if (!rawKey) return json({ error: "Missing 'name' parameter" }, 400);
-
-      // Check Key Length (256B)
       if (new TextEncoder().encode(rawKey).length > 256) return json({ error: "Key too long" }, 400);
 
       const fullKey = `${scope}DB:${rawKey}`;
@@ -119,7 +139,6 @@ export default {
 
       if (request.method === "POST") {
         const bodyText = await request.text();
-        // Check Value Size (8MB)
         if (new TextEncoder().encode(bodyText).length > 8 * 1024 * 1024) return json({ error: "Value too large" }, 413);
 
         const data = JSON.parse(bodyText);
@@ -152,19 +171,6 @@ function cors() {
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, x-pass"
   };
-}
-
-async function rateLimit(env, ip) {
-  const key = `rl:${ip}`;
-  const current = await env.DB.get(key, { type: "json" });
-  if (!current) {
-    await env.DB.put(key, JSON.stringify({ count: 1, t: Date.now() }), { expirationTtl: 60 });
-    return false;
-  }
-  if (current.count > 30) return true;
-  current.count++;
-  await env.DB.put(key, JSON.stringify(current), { expirationTtl: 60 });
-  return false;
 }
 
 function getIndexHtml() {

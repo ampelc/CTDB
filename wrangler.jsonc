@@ -21,14 +21,15 @@
 		}
 	],
 	"ratelimits": [
-        {
-            "binding": "RATE_LIMITER",
-            "simple": {
-                "limit": 30,
-                "period": 120
-            }
-        }
-    ]
+	    {
+	        "name": "RATE_LIMITER",
+	        "namespace_id": "1",
+	        "simple": {
+	            "limit": 10,
+	            "period": 60
+	        }
+	    }
+	]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
