@@ -19,7 +19,16 @@
 			"binding": "DB",
 			"id": "74f099f23747439eb27c2ceaa840dc24"
 		}
-	]
+	],
+	"ratelimits": [
+        {
+            "binding": "RATE_LIMITER",
+            "simple": {
+                "limit": 30,
+                "period": 120
+            }
+        }
+    ]
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

@@ -21,9 +21,8 @@ export default {
 
     // 🛡️ RATE LIMIT (Applies to all API and Mod routes)
     if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/CTDBv2/") || url.pathname.startsWith("/moderate")) {
-      if (await rateLimit(env, ip)) {
-        return json({ error: "Too many requests" }, 429);
-      }
+	const { success } = await env.MY_RATE_LIMITER.limit({ key: ip });
+   if (!success) return new Response("Too many requests", { status: 429 });
     }
 
     // 🏠 ROOT INDEX
@@ -53,7 +52,7 @@ export default {
           <div class="item p-6 hover:bg-gray-50 transition-colors">
             <div class="flex justify-between items-start mb-2">
               <span class="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">${key.name}</span>
-              <button hx-post="/moderate/delete" hx-vals='{"key":"${key.name}","pass":"${pass}"}' 
+              <button hx-post="/moderate/delete" hx-include='{"key":"${key.name}","pass":"${pass}"}' 
                       hx-target="closest .item" hx-swap="outerHTML"
                       class="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-xs font-semibold border border-red-200">
                 Delete
@@ -91,6 +90,11 @@ export default {
         const safe = JSON.parse(JSON.stringify(data).replace(/(\w+)/g, m => filter.isProfane(m) ? "***" : m));
         await env.DB.put(fullKey, JSON.stringify(safe));
         return json({ ok: true, stored: safe });
+      }
+
+      if (request.method === "DELETE") {
+        await env.DB.delete(fullKey);
+        return json({ ok: true });
       }
     }
 
